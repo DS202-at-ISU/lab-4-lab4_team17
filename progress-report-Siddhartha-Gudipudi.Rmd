@@ -1,0 +1,80 @@
+---
+title: "progress-report-CyberDragon25.Rmd"
+author: "Siddhartha Gudipudi (NetID: siddu123)"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Lab 4: (siddu123) Scraping (into) the Hall of Fame
+```{r}
+# Load necessary libraries
+library(rvest)
+library(dplyr)
+
+url <- "https://www.baseball-reference.com/awards/hof_2023.shtml"
+
+page <- read_html(url)
+
+table <- page %>% html_table(fill = TRUE)
+
+# Clean the extracted table
+hall_of_fame_2023 <- table[[1]]  
+
+str(hall_of_fame_2023)
+
+library(Lahman)
+head(HallOfFame, 3)
+
+```
+
+
+```{r}
+# Load necessary libraries
+library(rvest)
+library(dplyr)
+library(Lahman)
+
+url <- "https://www.baseball-reference.com/awards/hof_2023.shtml"
+
+page <- read_html(url)
+
+table <- page %>% html_table(fill = TRUE)
+
+# Clean the extracted table
+hall_of_fame_2023 <- table[[1]] 
+
+# Rename columns to match the structure of HallOfFame data
+colnames(hall_of_fame_2023) <- c("playerID", "yearID", "votedBy", "ballots", "needed", "votes", "inducted", "category", "needed_note")
+
+# Convert necessary columns to appropriate data types
+hall_of_fame_2023$yearID <- as.integer(hall_of_fame_2023$yearID)
+hall_of_fame_2023$ballots <- as.integer(hall_of_fame_2023$ballots)
+hall_of_fame_2023$needed <- as.integer(hall_of_fame_2023$needed)
+hall_of_fame_2023$votes <- as.integer(hall_of_fame_2023$votes)
+hall_of_fame_2023$inducted <- ifelse(hall_of_fame_2023$inducted == "Y", "Y", "N")  # Convert to "Y" or "N"
+
+# Append the new data frame to the existing HallOfFame data frame
+HallOfFame <- bind_rows(HallOfFame, hall_of_fame_2023)
+
+# Save the updated HallOfFame data frame back to the Lahman package
+save(HallOfFame, file = "HallOfFame.rda", compress = "xz")
+
+```
+
+```{r}
+library(ggplot2)
+HallOfFame %>% 
+  ggplot(aes(x = yearID, fill = inducted)) +
+  geom_bar() +
+  xlim(c(1936, 2022))
+```
+
+```{r}
+# creating the csv file
+write.csv(HallOfFame, "HallOfFame.csv", row.names = FALSE)
+
+```
