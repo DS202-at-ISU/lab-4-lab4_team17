@@ -1,0 +1,78 @@
+---
+title: "Lab 6"
+author: "Michael Friedman"
+date: "2024-04-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+library(rvest)
+
+# Read in the url and the table.
+
+page <- read_html("https://www.baseball-reference.com/awards/hof_2023.shtml") %>% html_table()
+
+hofdata23 <- as.data.frame(page[[1]])
+
+# Clean the data to determine what we need.
+
+colnames(hofdata23) <- hofdata23[1, ]
+hofdata23 <- hofdata23[-1, ]
+
+str(hofdata23)
+head(hofdata23, 3)
+
+```
+
+
+```{r}
+
+library(dplyr)
+
+# It appears there are duplicates of the same variable name, let's fix that.
+
+duplicated_names <- duplicated(names(hofdata23))
+duplicated_columns <- names(hofdata23)[duplicated_names]
+new_names <- make.unique(names(hofdata23))
+names(hofdata23) <- new_names
+
+# Add the variables listed in the Lahman database.
+
+# To determine the votes needed I found that a baseball player must get 75% of the votes to make the HOF. 0.75 * 389 = 291.75, we'll use 292.
+
+hofdata23 <- hofdata23 %>%
+  mutate(
+    playerid = tolower(gsub("^X-| ", "", Name)),
+    yearid = 2023,
+    votedby = "BBWAA",
+    ballots = 389,
+    needed = 292,
+    votes = Votes,
+    inducted = factor(ifelse(votes > 291, "Y", "N"), levels = c("Y", "N")),
+    category = "Player",
+    needed_note = NA
+  )
+
+```
+
+
+```{r}
+
+# Take in the HOF data set from the Lahman package.
+
+library(Lahman)
+
+data("HallOfFame", package = "Lahman")
+
+# Combine the data sets and write it into a CSV file.
+
+finalhofdata <- rbind(HallOfFame, hofdata23)
+write_csv(finalhofdata, "HallOfFame2023.csv")
+
+```
