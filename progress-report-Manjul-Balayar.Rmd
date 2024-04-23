@@ -1,0 +1,116 @@
+---
+title: "Progress Report"
+author: "Manjul Balayar"
+date: "2024-04-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(rvest)
+library(Lahman)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Loading the Hall of Fame dataset from Lahman package to check its structure.
+data("HallOfFame", package = "Lahman")
+head(HallOfFame)
+```
+
+## Web Scraping Verification
+
+```{r}
+# Scrape the webpage and check the structure of the tables.
+url_2023 <- "https://www.baseball-reference.com/awards/hof_2023.shtml"
+web_page <- read_html(url_2023)
+hof_tables <- html_table(web_page, fill = TRUE)
+# Display the structure of all scraped tables to identify which one we need.
+str(hof_tables)
+# Show the first few rows of the first table to ensure it's correct.
+head(hof_tables[[1]])
+```
+
+## Data Cleaning and Setup
+
+```{r}
+# Assuming the first table is correct, let's clean and set up columns.
+hof_2023_raw <- hof_tables[[1]]
+names(hof_2023_raw) <- as.character(hof_2023_raw[1,])
+hof_2023 <- hof_2023_raw[-1, ]
+names(hof_2023) <- names(hof_2023) %>% trimws()
+# Convert names to a standardized lowercase format to avoid case sensitivity issues.
+names(hof_2023) <- tolower(names(hof_2023))
+# Verify the structure after renaming.
+str(hof_2023)
+```
+
+## Handling Duplicate Column Names
+
+```{r}
+# Check current names and identify duplicates
+print(names(hof_2023))
+
+# Renaming duplicate columns by appending a prefix based on their order or context (e.g., batting or pitching)
+names(hof_2023) <- make.unique(names(hof_2023), sep = "_")
+
+# Alternatively, you can manually rename to be more descriptive, especially for critical columns like 'g', 'h', 'hr', 'bb':
+names(hof_2023)[which(names(hof_2023) == "g")] <- c("games_batting", "games_pitching")
+names(hof_2023)[which(names(hof_2023) == "h")] <- c("hits_batting", "hits_pitching")
+names(hof_2023)[which(names(hof_2023) == "hr")] <- c("home_runs_batting", "home_runs_pitching")
+names(hof_2023)[which(names(hof_2023) == "bb")] <- c("walks_batting", "walks_pitching")
+
+# Verify the changes
+print(names(hof_2023))
+```
+
+## Data Transformation
+
+```{r}
+# Constants for vote calculations
+total_ballots_2023 <- 389
+votes_needed_2023 <- 292  # Calculated based on some criteria like 75% of total ballots
+
+# Transform data, ensuring column names now match the unique ones assigned
+hof_2023_transformed <- hof_2023 %>% 
+  mutate(
+    playerid = gsub("X-", "", tolower(name)),  # Adjust based on the column 'name'
+    yearid = 2023,
+    votedby = "BBWAA",
+    ballots = total_ballots_2023,
+    needed = votes_needed_2023,
+    votes = as.integer(votes),
+    inducted = ifelse(votes >= votes_needed_2023, "Y", "N"),
+    category = "Player",  # Assuming all entries are for players
+    needed_note = NA_character_
+  )
+
+# Verify the transformed data
+head(hof_2023_transformed)
+```
+
+```{r}
+hof_2023_transformed <- hof_2023_transformed %>%
+  select(playerID = playerid, yearID = yearid, votedBy = votedby,
+         ballots, needed, votes, inducted, category, needed_note)
+
+# Convert the 'inducted' column from character to factor to match the Lahman 'HallOfFame' dataset
+hof_2023_transformed$inducted <- factor(hof_2023_transformed$inducted, levels = c("N", "Y"))
+
+# Verify the structure again
+str(hof_2023_transformed)
+
+```
+
+## Data Integration and Export
+
+```{r}
+# Combine with existing Hall of Fame data.
+combined_hof <- rbind(HallOfFame, hof_2023_transformed)
+# Export to CSV.
+write_csv(combined_hof, "HallOfFame2023.csv")
+```
